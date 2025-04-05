@@ -1,0 +1,22 @@
+name: Review build
+
+on:
+  pull_request:
+    branches: ["main"]
+
+# note: if using yarn or pnpm, change the below steps
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build the app
+        run: npm run build

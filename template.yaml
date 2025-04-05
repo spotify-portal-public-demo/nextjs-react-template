@@ -1,0 +1,141 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: nextjs-react-template
+  title: Next.js React Web Application
+  description: Create a simple web application using Next.js and React
+  tags:
+    - frontend
+    - react
+    - nextjs
+spec:
+  owner: group:devex
+  type: website
+
+  parameters:
+    - title: About
+      required:
+        - component_id
+      properties:
+        component_id:
+          title: Name
+          type: string
+          description: The unique name of the website
+          ui:field: EntityNamePicker
+        description:
+          title: Description
+          type: string
+          description: Description of the website
+
+    - title: Ownership
+      required:
+        - owner
+      properties:
+        owner:
+          title: Owner
+          type: string
+          description: Owner of the website
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              - kind: Group
+        system:
+          title: System
+          type: string
+          description: The system for the website
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              - kind: System
+
+    - title: Configuration
+      properties:
+        domain:
+          title: Expose on domain
+          type: string
+          description: If specified, the website will be exposed publicly at <domain>.demo.spotifyportal.com
+          ui:field: EntityNamePicker # used for validation only
+
+    - title: Location
+      required:
+        - repoUrl
+      properties:
+        repoUrl:
+          title: Repository location
+          type: string
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts:
+              - github.com
+
+  steps:
+    - id: template
+      name: Fetch Skeleton
+      action: fetch:template
+      input:
+        url: ./skeleton
+        targetPath: repo
+        copyWithoutRender:
+          - .github/workflows/*
+        values:
+          component_id: ${{ parameters.component_id }}
+          description: ${{ parameters.description }}
+          owner: ${{ parameters.owner }}
+          system: ${{ parameters.system }}
+          expose: ${{ parameters.expose }}
+          destination: ${{ parameters.repoUrl | parseRepoUrl }}
+
+    - id: flux_fetch
+      name: Fetch Flux
+      action: fetch:plain
+      input:
+        url: https://github.com/spotify-portal-public-demo/flux
+        targetPath: flux
+
+    - id: flux_template
+      name: Add Manifest
+      action: fetch:template:file
+      input:
+        url: https://github.com/spotify-portal-public-demo/flux/blob/main/templates/flux-app.yaml
+        targetPath: flux/apps/${{ parameters.component_id }}.yaml
+        values:
+          component_id: ${{ parameters.component_id }}
+          destination: ${{ parameters.repoUrl | parseRepoUrl }}
+
+    - id: publish
+      name: Publish
+      action: publish:github
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        sourcePath: repo
+        description: This is ${{ parameters.component_id }}
+        repoVisibility: public
+        defaultBranch: main
+        protectEnforceAdmins: false
+
+    - id: flux_pr
+      name: Flux PR
+      action: publish:github:pull-request
+      input:
+        repoUrl: github.com?repo=flux&owner=spotify-portal-public-demo
+        sourcePath: flux
+        branchName: scaffolder-${{ parameters.component_id }}
+        title: add app ${{ parameters.component_id }}
+        description: This PR adds a new Flux manifest for '${{ parameters.component_id }}' which will enable deployments.
+
+    - id: register
+      name: Register
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps.publish.output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+
+  output:
+    links:
+      - title: Repository
+        url: ${{ steps.publish.output.remoteUrl }}
+      - title: Flux PR
+        url: ${{ steps.flux_pr.output.remoteUrl }}
+      - title: Open in catalog
+        icon: catalog
+        entityRef: ${{ steps.register.output.entityRef }}

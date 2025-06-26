@@ -75,7 +75,7 @@ spec:
       input:
         url: ./skeleton
         targetPath: repo
-        copyWithoutRender:
+        copyWithoutTemplating:
           - .github/workflows/*
         values:
           component_id: ${{ parameters.component_id }}
